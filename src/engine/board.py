@@ -8,10 +8,7 @@ class Board:
         self.width = width
         self.height = height
 
-        self.cells = [
-            [Cell() for _ in range(height)]
-            for _ in range(width)
-        ]
+        self.cells = [[Cell() for _ in range(height)] for _ in range(width)]
 
         self.vertical_walls: set[tuple[int, int]] = set()
         self.horizontal_walls: set[tuple[int, int]] = set()
