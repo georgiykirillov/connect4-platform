@@ -1,5 +1,5 @@
-from engine.board import Board
 from engine.game import Game
+
 
 def test_diag() -> None:
     # 1. Arrange: создаем чистую доску
@@ -32,12 +32,6 @@ def test_diag() -> None:
     success = game.make_move(column=4)
     assert success is True
 
-
-
-
-
-
-
     # 3. Assert: ход удался, фишка на строке 0, а строка 1 пустая
     assert game.board.cells[1][0].player == 1
 
@@ -54,8 +48,3 @@ def test_diag() -> None:
     assert game.board.cells[4][3].player == 1
 
     assert game.board.cells[6][0].player == 2
-
-
-
-
-

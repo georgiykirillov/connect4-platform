@@ -1,7 +1,7 @@
-from engine.board import Board
 from engine.game import Game
-def test_smoke() -> None:
 
+
+def test_smoke() -> None:
     """Временный тест-заглушка, чтобы проверить работу CI."""
     game = Game()
     success = game.make_move(column=3)

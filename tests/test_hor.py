@@ -1,5 +1,5 @@
-from engine.board import Board
 from engine.game import Game
+
 
 def test_horizontal() -> None:
     # 1. Arrange: создаем чистую доску
@@ -25,12 +25,6 @@ def test_horizontal() -> None:
     success = game.make_move(column=4)
     assert success is False
 
-
-
-
-
-
-
     # 3. Assert: ход удался, фишка на строке 0, а строка 1 пустая
     assert game.board.cells[1][0].player == 1
     assert game.board.cells[1][1].player == 2
@@ -43,8 +37,3 @@ def test_horizontal() -> None:
 
     assert game.board.cells[4][0].player == 1
     assert game.board.cells[4][1].player == 0
-
-
-
-
-
