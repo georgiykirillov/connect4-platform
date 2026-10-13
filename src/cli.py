@@ -10,28 +10,16 @@ def render_board(board: Board) -> None:
         for x in range(board.width):
             cell = board.cells[x][y]
 
-            if cell.player == 0:
+            if cell == 0:
                 symbol = "."
-            elif cell.player == 1:
+            elif cell == 1:
                 symbol = "X"
             else:
                 symbol = "O"
 
-            print(symbol, end="")
-
-            if x < board.width - 1:
-                print("   ", end="")
+            print(symbol, end=("   " if x < board.width - 1 else "\n"))
 
         print()
-
-        if y > 0:
-            for x in range(board.width):
-                print("   ", end="")
-
-                if x < board.width - 1:
-                    print(" ", end="")
-
-            print()
 
     for x in range(board.width):
         print(f"{x + 1}   ", end="")
@@ -43,7 +31,7 @@ def main() -> None:
     game = Game()
 
     print("CONNECT FOUR")
-    print("Введите номер колонки от 1 до 7.")
+    print(f"Введите номер колонки от 1 до {game.board.width}.")
     print("Игрок 1 — X")
     print("Игрок 2 — O")
 
@@ -56,7 +44,7 @@ def main() -> None:
         try:
             column = int(input("Колонка: ")) - 1
         except ValueError:
-            print("Введите число от 1 до 7.")
+            print(f"Введите целое число от 1 до {game.board.width}.")
             continue
 
         if not game.make_move(column):
@@ -67,7 +55,7 @@ def main() -> None:
 
     print()
 
-    if game.winner is not None:
+    if game.winner != 0:
         print(f"Игрок {game.winner} победил!")
     else:
         print("Ничья!")
