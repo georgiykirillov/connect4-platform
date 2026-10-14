@@ -1,7 +1,7 @@
 from engine.game import Game
 
 
-def test_diag() -> None:
+def test_diag_up() -> None:
     game = Game()
 
     success = game.make_move(column=1)
