@@ -41,7 +41,7 @@ def read_state() -> dict[str, object]:
 @app.post("/api/move")
 def make_move(request: MoveRequest) -> dict[str, object]:
     if not game.make_move(request.column):
-        raise HTTPException(status_code=400, detail="В эту колонку нельзя поставить фишку.")
+        raise HTTPException(status_code=400, detail="Сюда нельзя поставить фишку.")
     return get_state()
 
 
