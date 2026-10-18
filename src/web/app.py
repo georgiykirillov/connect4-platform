@@ -6,14 +6,14 @@ from pydantic import BaseModel, Field
 
 from engine.game import Game
 
+
 app = FastAPI(title="Connect Four")
 BASE_DIR = Path(__file__).resolve().parent
-
 game = Game()
 
 
 class MoveRequest(BaseModel):
-    column: int = Field(ge=0, le=6)
+    column: int = Field(ge=0, lt=game.board.width)
 
 
 def get_state() -> dict[str, object]:
