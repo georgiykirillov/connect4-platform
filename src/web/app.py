@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 
 from engine.game import Game
 
-
 app = FastAPI(title="Connect Four")
 BASE_DIR = Path(__file__).resolve().parent
+
 game = Game()
 
 
