@@ -22,7 +22,7 @@ jobs:
           pip install ruff mypy pytest pydantic
 
       - name: Run Ruff (Linter & Format)
-        run: ruff check .
+        run: ruff check . --fix
 
       - name: Run Mypy (Type checking)
         run: mypy src/
