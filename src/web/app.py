@@ -74,6 +74,7 @@ def get_state() -> GameStateResponse:
 async def broadcast_state() -> None:
     state = get_state().model_dump(mode="json")
     disconnected = set()
+    column: int = Field(ge=0, lt=game.board.width)
 
     for connection, player_id in list(connections.items()):
         try:

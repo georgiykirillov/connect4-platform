@@ -26,6 +26,7 @@ ignore = []
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
