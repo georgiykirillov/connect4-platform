@@ -1,5 +1,5 @@
-from pathlib import Path
 from asyncio import Lock
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -7,13 +7,14 @@ from pydantic import BaseModel
 
 from api.schemas import (
     BoardState,
+    Field,
     GameMeta,
     GameStateResponse,
     GameStatus,
     MoveRequest,
 )
 from engine.game import Game
-
+from typing import Optional
 app = FastAPI(title="Connect Four")
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -23,13 +24,13 @@ players: dict[str, int] = {}
 game_lock = Lock()
 
 
-class MoveRequest(BaseModel):
-    column: int = Field(ge=0, le=6)
+#class MoveRequest(BaseModel):
+#    column: int = Field(ge=0, le=6)
 class PlayerRequest(BaseModel):
     player_id: str
 
 
-def assign_player(player_id: str) -> int | None:
+def assign_player(player_id: str) -> Optional[int]:
     if player_id in players:
         return players[player_id]
 
@@ -74,7 +75,7 @@ def get_state() -> GameStateResponse:
 async def broadcast_state() -> None:
     state = get_state().model_dump(mode="json")
     disconnected = set()
-    column: int = Field(ge=0, lt=game.board.width)
+    Field(ge=0, lt=game.board.width)
 
     for connection, player_id in list(connections.items()):
         try:

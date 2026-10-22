@@ -1,10 +1,13 @@
-from enum import Enum
-from typing import Literal
-
+try:
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
+    #I have python3.9, works for me:)
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class GameStatus(str, Enum):
+class GameStatus(StrEnum):
     WAITING = "waiting"
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
@@ -26,7 +29,7 @@ class BoardState(BaseModel):
 class GameMeta(BaseModel):
     status: GameStatus
     current_player: Literal[1, 2]
-    winner: Literal[1, 2] | None = None
+    winner: Optional[Literal[1, 2]]
 
 
 class GameStateResponse(BaseModel):
