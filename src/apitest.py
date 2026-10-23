@@ -13,7 +13,7 @@ class Move(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def hello():
+async def hello() -> str:
     return """
     <!DOCTYPE html>
     <html lang="ru">
@@ -59,7 +59,7 @@ async def hello():
 
 
 @app.post("/api/move")
-async def make_move(move: Move):
+async def make_move(move: Move) -> dict[str, str]:
     print(f"Получен ход в колонку {move.column}")
     game = Game()
     game.make_move(move.column)

@@ -36,4 +36,4 @@ class GameStateResponse(BaseModel):
     game: GameMeta
     board: BoardState
     game_id: str = "main"
-    modifiers: dict = Field(default_factory=dict)
+    modifiers: dict = Field(default_factory=dict[str, int])
