@@ -1,7 +1,4 @@
-try:
-    from enum import StrEnum
-except ImportError:
-    from backports.strenum import StrEnum
+from backports.strenum import StrEnum
     #I have python3.9, works for me:)
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
