@@ -14,7 +14,7 @@ from api.schemas import (
     MoveRequest,
 )
 from engine.game import Game
-from typing import Optional
+
 app = FastAPI(title="Connect Four")
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -24,13 +24,13 @@ players: dict[str, int] = {}
 game_lock = Lock()
 
 
-#class MoveRequest(BaseModel):
+# class MoveRequest(BaseModel):
 #    column: int = Field(ge=0, le=6)
 class PlayerRequest(BaseModel):
     player_id: str
 
 
-def assign_player(player_id: str) -> Optional[int]:
+def assign_player(player_id: str) -> int | None:
     if player_id in players:
         return players[player_id]
 
@@ -48,10 +48,7 @@ def get_state() -> GameStateResponse:
     width = game.board.width
     height = game.board.height
 
-    cells = [
-        [game.board.cells[x][y] for x in range(width)]
-        for y in range(height)
-    ]
+    cells = [[game.board.cells[x][y] for x in range(width)] for y in range(height)]
 
     if not game.finished:
         status = GameStatus.IN_PROGRESS
@@ -79,11 +76,13 @@ async def broadcast_state() -> None:
 
     for connection, player_id in list(connections.items()):
         try:
-            await connection.send_json({
-                "type": "state",
-                "state": state,
-                "player": players.get(player_id),
-            })
+            await connection.send_json(
+                {
+                    "type": "state",
+                    "state": state,
+                    "player": players.get(player_id),
+                }
+            )
         except Exception:
             disconnected.add(connection)
 
@@ -164,11 +163,13 @@ async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
     connections[websocket] = player_id
 
     try:
-        await websocket.send_json({
-            "type": "init",
-            "state": get_state().model_dump(mode="json"),
-            "player": player,
-        })
+        await websocket.send_json(
+            {
+                "type": "init",
+                "state": get_state().model_dump(mode="json"),
+                "player": player,
+            }
+        )
 
         while True:
             await websocket.receive_text()

@@ -1,6 +1,12 @@
-from backports.strenum import StrEnum
-    #I have python3.9, works for me:)
-from typing import Literal, Optional
+import sys
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from backports.strenum import StrEnum
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -26,11 +32,11 @@ class BoardState(BaseModel):
 class GameMeta(BaseModel):
     status: GameStatus
     current_player: Literal[1, 2]
-    winner: Optional[Literal[1, 2]]
+    winner: Literal[1, 2] | None
 
 
 class GameStateResponse(BaseModel):
     game: GameMeta
     board: BoardState
     game_id: str = "main"
-    modifiers: dict[str,int] = Field(default_factory=dict[str, int])
+    modifiers: dict[str, int] = Field(default_factory=dict[str, int])
