@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from api.schemas import (
     BoardState,
-    Field,
     GameMeta,
     GameStateResponse,
     GameStatus,
@@ -24,8 +23,6 @@ players: dict[str, int] = {}
 game_lock = Lock()
 
 
-# class MoveRequest(BaseModel):
-#    column: int = Field(ge=0, le=6)
 class PlayerRequest(BaseModel):
     player_id: str
 
@@ -48,7 +45,10 @@ def get_state() -> GameStateResponse:
     width = game.board.width
     height = game.board.height
 
-    cells = [[game.board.cells[x][y] for x in range(width)] for y in range(height)]
+    cells = [
+        [game.board.cells[x][y] for x in range(width)]
+        for y in range(height)
+    ]
 
     if not game.finished:
         status = GameStatus.IN_PROGRESS
@@ -63,7 +63,11 @@ def get_state() -> GameStateResponse:
             current_player=game.current_player,
             winner=game.winner if game.winner in (1, 2) else None,
         ),
-        board=BoardState(width=width, height=height, cells=cells),
+        board=BoardState(
+            width=width,
+            height=height,
+            cells=cells,
+        ),
         game_id="main",
         modifiers={},
     )
@@ -71,8 +75,7 @@ def get_state() -> GameStateResponse:
 
 async def broadcast_state() -> None:
     state = get_state().model_dump(mode="json")
-    disconnected = set()
-    Field(ge=0, lt=game.board.width)
+    disconnected: list[WebSocket] = []
 
     for connection, player_id in list(connections.items()):
         try:
@@ -84,7 +87,7 @@ async def broadcast_state() -> None:
                 }
             )
         except Exception:
-            disconnected.add(connection)
+            disconnected.append(connection)
 
     for connection in disconnected:
         connections.pop(connection, None)
@@ -97,12 +100,18 @@ def index() -> FileResponse:
 
 @app.get("/style.css", include_in_schema=False)
 def stylesheet() -> FileResponse:
-    return FileResponse(BASE_DIR / "style.css", media_type="text/css")
+    return FileResponse(
+        BASE_DIR / "style.css",
+        media_type="text/css",
+    )
 
 
 @app.get("/script.js", include_in_schema=False)
 def javascript() -> FileResponse:
-    return FileResponse(BASE_DIR / "script.js", media_type="text/javascript")
+    return FileResponse(
+        BASE_DIR / "script.js",
+        media_type="text/javascript",
+    )
 
 
 @app.get("/api/state", response_model=GameStateResponse)
@@ -114,7 +123,10 @@ async def read_state() -> GameStateResponse:
 async def make_move(request: MoveRequest) -> GameStateResponse:
     async with game_lock:
         if request.game_id != "main":
-            raise HTTPException(status_code=404, detail="Игра не найдена.")
+            raise HTTPException(
+                status_code=404,
+                detail="Игра не найдена.",
+            )
 
         player = players.get(request.player_id)
 
@@ -125,7 +137,10 @@ async def make_move(request: MoveRequest) -> GameStateResponse:
             )
 
         if game.finished:
-            raise HTTPException(status_code=400, detail="Игра уже завершена.")
+            raise HTTPException(
+                status_code=400,
+                detail="Игра уже завершена.",
+            )
 
         if game.current_player != player:
             raise HTTPException(
@@ -134,7 +149,10 @@ async def make_move(request: MoveRequest) -> GameStateResponse:
             )
 
         if not game.make_move(request.column):
-            raise HTTPException(status_code=400, detail="Сюда нельзя поставить фишку.")
+            raise HTTPException(
+                status_code=400,
+                detail="Сюда нельзя поставить фишку.",
+            )
 
         await broadcast_state()
         return get_state()
@@ -157,8 +175,12 @@ async def reset_game(request: PlayerRequest) -> GameStateResponse:
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
+async def websocket_endpoint(
+    websocket: WebSocket,
+    player_id: str,
+) -> None:
     await websocket.accept()
+
     player = assign_player(player_id)
     connections[websocket] = player_id
 
@@ -173,7 +195,9 @@ async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
 
         while True:
             await websocket.receive_text()
+
     except WebSocketDisconnect:
         pass
+
     finally:
         connections.pop(websocket, None)

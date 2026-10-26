@@ -1,16 +1,11 @@
-import sys
-
-if sys.version_info >= (3, 11):
-    from enum import StrEnum
-else:
-    from backports.strenum import StrEnum
+from enum import Enum
 
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class GameStatus(StrEnum):
+class GameStatus(str, Enum):
     WAITING = "waiting"
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
