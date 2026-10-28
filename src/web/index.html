@@ -1,124 +1,46 @@
-<!-- Бебебе, стражно навайбкожено, лучше не трогать-->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Connect Four</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; min-height: 100svh;
-      display: grid; place-items: center; padding: 8px;
-      background: #f2f5f9; color: #182230;
-      font-family: system-ui, sans-serif;
-    }
-    main { width: min(100%, 680px); text-align: center; }
-    h1 { margin: 0 0 2px; font-size: clamp(1.35rem, 3.5vh, 2rem); }
-    #status { margin: 0 0 8px; font-size: clamp(.9rem, 2.2vh, 1.05rem); font-weight: 650; }
-    #board {
-      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: clamp(3px, 1vh, 7px); padding: clamp(5px, 1.2vh, 10px);
-      width: min(100%, calc((100svh - 155px) * 1.14));
-      margin: auto; background: #1768c4; border-radius: 14px;
-    }
-    .column { display: grid; gap: clamp(3px, 1vh, 7px); padding: 0; border: 0; background: none; cursor: pointer; min-width: 0; }
-    .column:disabled { cursor: default; }
-    .cell { width: 100%; aspect-ratio: 1; border-radius: 50%; background: #f2f5f9; box-shadow: inset 0 2px 5px #0002; }
-    .cell.p1 { background: #f5c542; }
-    .cell.p2 { background: #e95c55; }
-    .column:not(:disabled):hover .cell.empty { background: #d9e8fb; }
-    .controls, .legend { display: flex; justify-content: center; align-items: center; gap: 12px; }
-    .controls { margin-top: 8px; flex-wrap: wrap; }
-    .action { padding: 7px 13px; border: 0; border-radius: 8px; background: #182230; color: white; font: inherit; font-size: .9rem; cursor: pointer; }
-    .action:hover { background: #34445a; }
-    .legend { margin-top: 7px; color: #475467; font-size: .82rem; }
-    .dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; }
-    .yellow { background: #f5c542; }
-    .red { background: #e95c55; }
-    #error { min-height: 1.1em; margin: 4px 0 0; color: #b42318; font-size: .85rem; }
-    @media (max-height: 620px) {
-      body { padding: 4px; }
-      h1 { font-size: 1.3rem; }
-      #status { margin-bottom: 4px; font-size: .9rem; }
-      #board { width: min(100%, calc((100svh - 125px) * 1.14)); }
-      .controls, .legend { margin-top: 4px; }
-      #error { margin-top: 2px; }
-    }
-    @media (max-width: 480px) {
-      #board { width: min(100%, calc((100svh - 155px) * 1.14)); }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/script.js" defer></script>
 </head>
 <body>
-  <main>
-    <h1>Connect Four</h1>
-    <p id="status" aria-live="polite">Загрузка игры…</p>
-    <div id="board" aria-label="Игровое поле"></div>
-    <div class="legend">
-      <span><i class="dot yellow"></i> Игрок 1</span>
-      <span><i class="dot red"></i> Игрок 2</span>
-    </div>
-    <div class="controls"><button class="action" id="reset">Новая игра</button></div>
-    <p id="error" role="alert"></p>
-  </main>
-  <script>
-    const board = document.getElementById("board");
-    const status = document.getElementById("status");
-    const error = document.getElementById("error");
+    <main class="game">
+        <header class="game-header">
+            <h1>Connect <span>Four</span></h1>
+            <p class="subtitle">Соедини четыре фишки в ряд и победи.</p>
+        </header>
 
-    async function request(url, options = {}) {
-      const response = await fetch(url, {
-        headers: { "Content-Type": "application/json" }, ...options
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Ошибка запроса.");
-      return data;
-    }
+        <section class="game-panel">
+            <div class="game-toolbar">
+                <div>
+                    <p class="label">ТЕКУЩИЙ СТАТУС</p>
+                    <h2 id="status">Загрузка игры...</h2>
+                </div>
+                <button id="reset" class="reset-button" type="button">
+                    Новая игра
+                </button>
+            </div>
 
-    function render(game) {
-      board.replaceChildren();
-      for (let x = 0; x < game.width; x++) {
-        const column = document.createElement("button");
-        column.className = "column";
-        column.disabled = game.finished;
-        column.type = "button";
-        column.setAttribute("aria-label", `Колонка ${x + 1}`);
+            <div class="players">
+                <div class="player">
+                    <span class="player-dot player-one"></span>
+                    <span>Игрок 1</span>
+                </div>
+                <div class="player">
+                    <span class="player-dot player-two"></span>
+                    <span>Игрок 2</span>
+                </div>
+            </div>
 
-        for (let y = game.height - 1; y >= 0; y--) {
-          const cell = document.createElement("span");
-          cell.className = "cell " + (
-            game.board[x][y] === 1 ? "p1" :
-            game.board[x][y] === 2 ? "p2" : "empty"
-          );
-          column.appendChild(cell);
-        }
+            <div id="board" class="board" aria-label="Игровое поле"></div>
 
-        column.onclick = () => play(x);
-        board.appendChild(column);
-      }
-
-      status.textContent = game.winner ? `Победил игрок ${game.winner}!` :
-        game.draw ? "Ничья!" : `Ход игрока ${game.current_player}`;
-    }
-
-    async function run(action) {
-      try {
-        render(await action());
-        error.textContent = "";
-      } catch (e) {
-        error.textContent = e.message;
-      }
-    }
-
-    const play = column => run(() => request("/api/move", {
-      method: "POST", body: JSON.stringify({ column })
-    }));
-
-    document.getElementById("reset").onclick = () =>
-      run(() => request("/api/reset", { method: "POST" }));
-
-    run(() => request("/api/state"));
-  </script>
+            <p id="error" class="error" role="alert"></p>
+            <p class="hint">Нажми на колонку, чтобы поставить фишку.</p>
+        </section>
+    </main>
 </body>
 </html>

@@ -19,3 +19,6 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
+
+# Файлы macOS
+.DS_Store
