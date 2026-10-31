@@ -14,31 +14,72 @@
             <p class="subtitle">Соедини четыре фишки в ряд и победи.</p>
         </header>
 
-        <section class="game-panel">
+        <section id="lobby-screen" class="panel">
+            <h2>Игровое лобби</h2>
+            <p class="description">
+                Создай стол или присоединись к существующей игре.
+            </p>
+
+            <label for="username">Твоё имя</label>
+            <input
+                id="username"
+                class="text-input"
+                type="text"
+                maxlength="24"
+                placeholder="Например, Alex"
+                autocomplete="nickname"
+            >
+
+            <button id="create-table" class="primary-button">
+                Создать стол
+            </button>
+
+            <div class="section-heading">
+                <h3>Открытые столы</h3>
+                <button id="refresh-tables" class="secondary-button">
+                    Обновить
+                </button>
+            </div>
+
+            <div id="tables-list" class="tables-list">
+                <p class="description">Загрузка столов...</p>
+            </div>
+
+            <p id="lobby-error" class="error" role="alert"></p>
+        </section>
+
+        <section id="game-screen" class="panel" hidden>
             <div class="game-toolbar">
                 <div>
-                    <p class="label">ТЕКУЩИЙ СТАТУС</p>
-                    <h2 id="status">Загрузка игры...</h2>
+                    <p class="label">ИГРОВОЙ СТОЛ</p>
+                    <h2 id="table-name">Загрузка...</h2>
+                    <p id="table-code" class="description"></p>
                 </div>
-                <button id="reset" class="reset-button" type="button">
-                    Новая игра
+
+                <button id="back-to-lobby" class="secondary-button">
+                    В лобби
                 </button>
             </div>
 
             <div class="players">
                 <div class="player">
                     <span class="player-dot player-one"></span>
-                    <span>Игрок 1</span>
+                    <span id="player-one-name">Игрок 1</span>
                 </div>
+
                 <div class="player">
                     <span class="player-dot player-two"></span>
-                    <span>Игрок 2</span>
+                    <span id="player-two-name">Игрок 2</span>
                 </div>
             </div>
 
+            <h2 id="status" class="game-status">
+                Подключение к игре...
+            </h2>
+
             <div id="board" class="board" aria-label="Игровое поле"></div>
 
-            <p id="error" class="error" role="alert"></p>
+            <p id="game-error" class="error" role="alert"></p>
             <p class="hint">Нажми на колонку, чтобы поставить фишку.</p>
         </section>
     </main>
