@@ -1,12 +1,16 @@
+from typing import Literal
+
 from engine.board import Board
 
 
 class Game:
-    def __init__(self) -> None:
-        self.board = Board()
-        self.current_player: int = 1
+    def __init__(self, width: int = 7, height: int = 6, modifiers: dict | None = None) -> None:
+        if modifiers is None:
+            modifiers = {}
+        self.board = Board(width, height, modifiers)
+        self.current_player: Literal[1, 2] = 1
         self.finished: bool = False
-        self.winner: int = 0
+        self.winner: Literal[0, 1, 2] = 0
 
     def make_move(self, column: int) -> bool:
         if self.finished:

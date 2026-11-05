@@ -3,7 +3,6 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
 from api.schemas import (
     BoardState,
@@ -11,6 +10,7 @@ from api.schemas import (
     GameStateResponse,
     GameStatus,
     MoveRequest,
+    PlayerRequest,
 )
 from engine.game import Game
 
@@ -20,77 +20,60 @@ BASE_DIR = Path(__file__).resolve().parent
 game = Game()
 connections: dict[WebSocket, str] = {}
 players: dict[str, int] = {}
+join_queue: dict[str, bool] = {}
 game_lock = Lock()
-
-
-class PlayerRequest(BaseModel):
-    player_id: str
 
 
 def assign_player(player_id: str) -> int | None:
     if player_id in players:
         return players[player_id]
 
-    occupied = set(players.values())
-
     for number in (1, 2):
-        if number not in occupied:
+        if number not in players.values():
             players[player_id] = number
             return number
+
+    if player_id not in join_queue:
+        join_queue[player_id] = True
 
     return None
 
 
 def get_state() -> GameStateResponse:
-    width = game.board.width
-    height = game.board.height
-
-    cells = [
-        [game.board.cells[x][y] for x in range(width)]
-        for y in range(height)
-    ]
-
     if not game.finished:
         status = GameStatus.IN_PROGRESS
-    elif game.winner in (1, 2):
-        status = GameStatus.FINISHED
     else:
-        status = GameStatus.DRAW
+        status = GameStatus.FINISHED
 
     return GameStateResponse(
         game=GameMeta(
             status=status,
             current_player=game.current_player,
-            winner=game.winner if game.winner in (1, 2) else None,
+            winner=game.winner,
         ),
         board=BoardState(
-            width=width,
-            height=height,
-            cells=cells,
+            width=game.board.width,
+            height=game.board.height,
+            cells=game.board.cells,
+            modifiers=game.board.modifiers,
         ),
         game_id="main",
-        modifiers={},
     )
 
 
 async def broadcast_state() -> None:
-    state = get_state().model_dump(mode="json")
-    disconnected: list[WebSocket] = []
-
-    for connection, player_id in list(connections.items()):
+    for websocket, player_id in list(connections.items()):
         try:
-            await connection.send_json(
+            await websocket.send_json(
                 {
                     "type": "state",
-                    "state": state,
+                    "state": get_state().model_dump(mode="json"),
                     "player": players.get(player_id),
                 }
             )
-        except Exception:
-            disconnected.append(connection)
 
-    for connection in disconnected:
-        connections.pop(connection, None)
+        except Exception:
+            pass
 
 
 @app.get("/", include_in_schema=False)
@@ -163,26 +146,28 @@ async def reset_game(request: PlayerRequest) -> GameStateResponse:
     global game
 
     async with game_lock:
-        if players.get(request.player_id) != 1:
+        if players.get(request.player_id) not in (1, 2):
             raise HTTPException(
                 status_code=403,
-                detail="Начать новую игру может только игрок 1.",
+                detail="Начать новую игру может игрок за столом.",
             )
 
         game = Game()
+
         await broadcast_state()
         return get_state()
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    player_id: str,
-) -> None:
+async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
     await websocket.accept()
 
-    player = assign_player(player_id)
-    connections[websocket] = player_id
+    async with game_lock:
+        player = assign_player(player_id)
+        connections[websocket] = player_id
+
+    if player in (1, 2):
+        await broadcast_state()
 
     try:
         await websocket.send_json(
@@ -197,7 +182,20 @@ async def websocket_endpoint(
             await websocket.receive_text()
 
     except WebSocketDisconnect:
-        pass
+        async with game_lock:
+            connections.pop(websocket, None)
+
+            if players[player_id] in (1, 2):
+                await reset_game(PlayerRequest(player_id=player_id))
+            else:
+                join_queue.pop(player_id, None)
+
+            players.pop(player_id, None)
+
+            if len(join_queue) > 0:
+                next_player_id = next(iter(join_queue))
+                assign_player(next_player_id)
+                join_queue.pop(next_player_id, None)
 
     finally:
-        connections.pop(websocket, None)
+        await broadcast_state()

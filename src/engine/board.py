@@ -1,14 +1,16 @@
+from typing import Literal
+
+
 class Board:
-    def __init__(self, width: int = 7, height: int = 6) -> None:
+    def __init__(self, width: int, height: int, modifiers: dict) -> None:
         self.width = width
         self.height = height
+        self.modifiers = modifiers
+        self.cells: list[list[Literal[0, 1, 2]]] = [
+            [0 for _ in range(height)] for _ in range(width)
+        ]
 
-        self.cells = [[0 for _ in range(height)] for _ in range(width)]
-
-        self.vertical_walls: set[tuple[int, int]] = set()
-        self.horizontal_walls: set[tuple[int, int]] = set()
-
-    def drop_piece(self, column: int, player: int) -> bool:
+    def drop_piece(self, column: int, player: Literal[1, 2]) -> bool:
         if column < 0 or column >= self.width:
             return False
 
