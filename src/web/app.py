@@ -1,7 +1,9 @@
 from asyncio import Lock
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from api.schemas import (
@@ -10,31 +12,43 @@ from api.schemas import (
     GameStateResponse,
     GameStatus,
     MoveRequest,
-    PlayerRequest,
 )
+from db.db import Base, User, engine
+from db.security import decode_token
 from engine.game import Game
+from web.auth import COOKIE_NAME, get_current_user, router
 
-app = FastAPI(title="Connect Four")
+
+@asynccontextmanager
+async def lifespan(app):
+    async with engine.begin() as con:
+        await con.run_sync(Base.metadata.create_all)
+    yield
+
+
+app = FastAPI(title="Connect Four", lifespan=lifespan)
+app.include_router(router)
 BASE_DIR = Path(__file__).resolve().parent
+ALLOWED_ORIGINS = {"http://localhost:8000"}
 
 game = Game()
-connections: dict[WebSocket, str] = {}
-players: dict[str, int] = {}
-join_queue: dict[str, bool] = {}
+connections: dict[WebSocket, int] = {}
+players: dict[int, int] = {}
+join_queue: dict[int, bool] = {}
 game_lock = Lock()
 
 
-def assign_player(player_id: str) -> int | None:
-    if player_id in players:
-        return players[player_id]
+def assign_player(user_id: int) -> int | None:
+    if user_id in players:
+        return players[user_id]
 
     for number in (1, 2):
         if number not in players.values():
-            players[player_id] = number
+            players[user_id] = number
             return number
 
-    if player_id not in join_queue:
-        join_queue[player_id] = True
+    if user_id not in join_queue:
+        join_queue[user_id] = True
 
     return None
 
@@ -62,18 +76,23 @@ def get_state() -> GameStateResponse:
 
 
 async def broadcast_state() -> None:
-    for websocket, player_id in list(connections.items()):
+    for websocket, user_id in list(connections.items()):
         try:
             await websocket.send_json(
                 {
                     "type": "state",
                     "state": get_state().model_dump(mode="json"),
-                    "player": players.get(player_id),
+                    "player": players.get(user_id),
                 }
             )
 
         except Exception:
             pass
+
+
+def reset() -> None:
+    global game
+    game = Game()
 
 
 @app.get("/", include_in_schema=False)
@@ -103,7 +122,9 @@ async def read_state() -> GameStateResponse:
 
 
 @app.post("/api/move", response_model=GameStateResponse)
-async def make_move(request: MoveRequest) -> GameStateResponse:
+async def make_move(
+    request: MoveRequest, user: Annotated[User, Depends(get_current_user)]
+) -> GameStateResponse:
     async with game_lock:
         if request.game_id != "main":
             raise HTTPException(
@@ -111,7 +132,7 @@ async def make_move(request: MoveRequest) -> GameStateResponse:
                 detail="Игра не найдена.",
             )
 
-        player = players.get(request.player_id)
+        player = players.get(user.id)
 
         if player not in (1, 2):
             raise HTTPException(
@@ -142,29 +163,33 @@ async def make_move(request: MoveRequest) -> GameStateResponse:
 
 
 @app.post("/api/reset", response_model=GameStateResponse)
-async def reset_game(request: PlayerRequest) -> GameStateResponse:
-    global game
-
+async def reset_game(user: Annotated[User, Depends(get_current_user)]) -> GameStateResponse:
     async with game_lock:
-        if players.get(request.player_id) not in (1, 2):
+        if players.get(user.id) not in (1, 2):
             raise HTTPException(
                 status_code=403,
-                detail="Начать новую игру может игрок за столом.",
+                detail="Начать новую игру может только игрок за столом.",
             )
 
-        game = Game()
+        reset()
 
         await broadcast_state()
         return get_state()
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    user_id = decode_token(websocket.cookies.get(COOKIE_NAME, ""))
+
+    if user_id is None or websocket.headers.get("origin") not in ALLOWED_ORIGINS:
+        await websocket.close(code=4401)
+        return
+
     await websocket.accept()
 
     async with game_lock:
-        player = assign_player(player_id)
-        connections[websocket] = player_id
+        player = assign_player(user_id)
+        connections[websocket] = user_id
 
     if player in (1, 2):
         await broadcast_state()
@@ -185,17 +210,18 @@ async def websocket_endpoint(websocket: WebSocket, player_id: str) -> None:
         async with game_lock:
             connections.pop(websocket, None)
 
-            if players[player_id] in (1, 2):
-                await reset_game(PlayerRequest(player_id=player_id))
-            else:
-                join_queue.pop(player_id, None)
+            if user_id not in connections.values():
+                if players.get(user_id) in (1, 2):
+                    reset()
+                else:
+                    join_queue.pop(user_id, None)
 
-            players.pop(player_id, None)
+                players.pop(user_id, None)
 
-            if len(join_queue) > 0:
-                next_player_id = next(iter(join_queue))
-                assign_player(next_player_id)
-                join_queue.pop(next_player_id, None)
+                if join_queue:
+                    next_user_id = next(iter(join_queue))
+                    assign_player(next_user_id)
+                    join_queue.pop(next_user_id, None)
 
     finally:
         await broadcast_state()

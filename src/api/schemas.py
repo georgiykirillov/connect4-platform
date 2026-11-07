@@ -1,7 +1,17 @@
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class Credentials(BaseModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
 
 
 class GameStatus(str, Enum):
@@ -10,14 +20,9 @@ class GameStatus(str, Enum):
     FINISHED = "finished"
 
 
-class PlayerRequest(BaseModel):
-    player_id: str
-
-
 class MoveRequest(BaseModel):
     column: int
     game_id: str = "main"
-    player_id: str
 
 
 class BoardState(BaseModel):
