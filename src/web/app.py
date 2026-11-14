@@ -1,47 +1,70 @@
+import asyncio
 from asyncio import Lock
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.schemas import (
     BoardState,
     GameMeta,
     GameStateResponse,
     GameStatus,
-    MoveRequest,
 )
-from engine.game import Game
+from api.tables import Player, Table, TableManager, TableStatus
 
-app = FastAPI(title="Connect Four")
+
+async def cleanup_tables() -> None:
+    while True:
+        await asyncio.sleep(10)
+        table_manager.remove_expired_tables()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cleanup_task = asyncio.create_task(cleanup_tables())
+
+    yield
+
+    cleanup_task.cancel()
+
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+app = FastAPI(
+    title="Connect Four",
+    lifespan=lifespan,
+)
 BASE_DIR = Path(__file__).resolve().parent
 
-game = Game()
-connections: dict[WebSocket, str] = {}
-players: dict[str, int] = {}
-game_lock = Lock()
+table_manager = TableManager()
+manager_lock = Lock()
+table_locks: dict[str, Lock] = {}
 
 
 class PlayerRequest(BaseModel):
     player_id: str
+    username: str = Field(min_length=1, max_length=24)
 
 
-def assign_player(player_id: str) -> int | None:
-    if player_id in players:
-        return players[player_id]
-
-    occupied = set(players.values())
-
-    for number in (1, 2):
-        if number not in occupied:
-            players[player_id] = number
-            return number
-
-    return None
+class MoveRequest(BaseModel):
+    player_id: str
+    column: int = Field(ge=0, le=6)
 
 
-def get_state() -> GameStateResponse:
+def get_table_lock(table_id: str) -> Lock:
+    if table_id not in table_locks:
+        table_locks[table_id] = Lock()
+
+    return table_locks[table_id]
+
+
+def get_table_state(table: Table) -> GameStateResponse:
+    game = table.game
     width = game.board.width
     height = game.board.height
 
@@ -50,7 +73,9 @@ def get_state() -> GameStateResponse:
         for y in range(height)
     ]
 
-    if not game.finished:
+    if table.status == TableStatus.WAITING:
+        status = GameStatus.WAITING
+    elif not game.finished:
         status = GameStatus.IN_PROGRESS
     elif game.winner in (1, 2):
         status = GameStatus.FINISHED
@@ -68,29 +93,52 @@ def get_state() -> GameStateResponse:
             height=height,
             cells=cells,
         ),
-        game_id="main",
+        game_id=table.table_id,
         modifiers={},
     )
 
 
-async def broadcast_state() -> None:
-    state = get_state().model_dump(mode="json")
-    disconnected: list[WebSocket] = []
+def serialize_table(table: Table) -> dict:
+    return {
+        "table_id": table.table_id,
+        "name": table.name,
+        "host": {
+            "id": table.host.id,
+            "username": table.host.username,
+        },
+        "guest": (
+            {
+                "id": table.guest.id,
+                "username": table.guest.username,
+            }
+            if table.guest is not None
+            else None
+        ),
+        "status": table.status.value,
+    }
 
-    for connection, player_id in list(connections.items()):
+
+async def broadcast_state(table: Table) -> None:
+    state = get_table_state(table).model_dump(mode="json")
+    disconnected: list[str] = []
+
+    for player_id, connection in list(table.connections.items()):
+        if not isinstance(connection, WebSocket):
+            continue
+
         try:
             await connection.send_json(
                 {
                     "type": "state",
                     "state": state,
-                    "player": players.get(player_id),
+                    "player": table.player_numbers.get(player_id),
                 }
             )
         except Exception:
-            disconnected.append(connection)
+            disconnected.append(player_id)
 
-    for connection in disconnected:
-        connections.pop(connection, None)
+    for player_id in disconnected:
+        table.connections.pop(player_id, None)
 
 
 @app.get("/", include_in_schema=False)
@@ -114,82 +162,154 @@ def javascript() -> FileResponse:
     )
 
 
-@app.get("/api/state", response_model=GameStateResponse)
-async def read_state() -> GameStateResponse:
-    return get_state()
+@app.get("/api/tables")
+async def get_open_tables() -> list[dict]:
+    return [
+        serialize_table(table)
+        for table in table_manager.get_open_tables()
+    ]
 
 
-@app.post("/api/move", response_model=GameStateResponse)
-async def make_move(request: MoveRequest) -> GameStateResponse:
-    async with game_lock:
-        if request.game_id != "main":
-            raise HTTPException(
-                status_code=404,
-                detail="Игра не найдена.",
-            )
+@app.post("/api/tables")
+async def create_table(request: PlayerRequest) -> dict:
+    username = request.username.strip()
 
-        player = players.get(request.player_id)
+    if not username:
+        raise HTTPException(
+            status_code=422,
+            detail="Имя игрока не может быть пустым.",
+        )
+
+    async with manager_lock:
+        player = Player(
+            id=request.player_id,
+            username=username,
+        )
+        table = table_manager.create_table(player)
+        table_locks[table.table_id] = Lock()
+
+    return serialize_table(table)
+
+
+@app.get("/api/tables/{table_id}")
+async def get_table(table_id: str) -> dict:
+    table = table_manager.get_table(table_id)
+
+    if table is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Стол не найден.",
+        )
+
+    return {
+        **serialize_table(table),
+        "state": get_table_state(table).model_dump(mode="json"),
+    }
+
+
+@app.post("/api/tables/{table_id}/join")
+async def join_table(table_id: str, request: PlayerRequest) -> dict:
+    username = request.username.strip()
+
+    if not username:
+        raise HTTPException(
+            status_code=422,
+            detail="Имя игрока не может быть пустым.",
+        )
+
+    async with manager_lock:
+        player = Player(
+            id=request.player_id,
+            username=username,
+        )
+        table = table_manager.join_table(table_id, player)
+
+    if table is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Невозможно присоединиться к этому столу.",
+        )
+
+    async with get_table_lock(table_id):
+        await broadcast_state(table)
+
+    return {
+        **serialize_table(table),
+        "state": get_table_state(table).model_dump(mode="json"),
+        "player": table.player_numbers.get(request.player_id),
+    }
+
+
+@app.post("/api/tables/{table_id}/move")
+async def make_move(
+    table_id: str,
+    request: MoveRequest,
+) -> GameStateResponse:
+    table = table_manager.get_table(table_id)
+
+    if table is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Стол не найден.",
+        )
+
+    async with get_table_lock(table_id):
+        player = table.player_numbers.get(request.player_id)
 
         if player not in (1, 2):
             raise HTTPException(
                 status_code=403,
-                detail="Ты не занял место игрока.",
+                detail="Ты не являешься игроком этого стола.",
             )
 
-        if game.finished:
+        if table.status != TableStatus.IN_PROGRESS:
             raise HTTPException(
                 status_code=400,
-                detail="Игра уже завершена.",
+                detail="Игра сейчас не идёт.",
             )
 
-        if game.current_player != player:
+        if table.game.current_player != player:
             raise HTTPException(
                 status_code=403,
                 detail="Сейчас ход другого игрока.",
             )
 
-        if not game.make_move(request.column):
+        if not table.game.make_move(request.column):
             raise HTTPException(
                 status_code=400,
                 detail="Сюда нельзя поставить фишку.",
             )
 
-        await broadcast_state()
-        return get_state()
+        if table.game.finished:
+            table.status = TableStatus.FINISHED
+
+        await broadcast_state(table)
+
+        return get_table_state(table)
 
 
-@app.post("/api/reset", response_model=GameStateResponse)
-async def reset_game(request: PlayerRequest) -> GameStateResponse:
-    global game
-
-    async with game_lock:
-        if players.get(request.player_id) != 1:
-            raise HTTPException(
-                status_code=403,
-                detail="Начать новую игру может только игрок 1.",
-            )
-
-        game = Game()
-        await broadcast_state()
-        return get_state()
-
-
-@app.websocket("/ws")
+@app.websocket("/ws/table/{table_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
+    table_id: str,
     player_id: str,
 ) -> None:
+    table = table_manager.get_table(table_id)
+
+    if table is None or player_id not in table.player_numbers:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
-    player = assign_player(player_id)
-    connections[websocket] = player_id
+    table.connections[player_id] = websocket
 
     try:
         await websocket.send_json(
             {
                 "type": "init",
-                "state": get_state().model_dump(mode="json"),
-                "player": player,
+                "state": get_table_state(table).model_dump(mode="json"),
+                "player": table.player_numbers.get(player_id),
             }
         )
 
@@ -200,4 +320,5 @@ async def websocket_endpoint(
         pass
 
     finally:
-        connections.pop(websocket, None)
+        if table.connections.get(player_id) is websocket:
+            table.connections.pop(player_id, None)

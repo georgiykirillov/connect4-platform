@@ -2,9 +2,12 @@ from engine.board import Board
 
 
 class Game:
-    def __init__(self) -> None:
+    def __init__(self, starting_player: int = 1) -> None:
+        if starting_player not in (1, 2):
+            raise ValueError("Starting player must be 1 or 2.")
+
         self.board = Board()
-        self.current_player: int = 1
+        self.current_player: int = starting_player
         self.finished: bool = False
         self.winner: int = 0
 
