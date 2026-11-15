@@ -19,6 +19,7 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
+.env.sh
 
 # Файлы macOS
 .DS_Store

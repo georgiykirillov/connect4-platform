@@ -1,46 +1,59 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect Four</title>
-    <link rel="stylesheet" href="/style.css">
-    <script src="/script.js" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Четыре в ряд</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <main class="game">
-        <header class="game-header">
-            <h1>Connect <span>Four</span></h1>
-            <p class="subtitle">Соедини четыре фишки в ряд и победи.</p>
-        </header>
+  <main id="auth" class="screen" hidden>
+    <h1>Четыре в ряд</h1>
 
-        <section class="game-panel">
-            <div class="game-toolbar">
-                <div>
-                    <p class="label">ТЕКУЩИЙ СТАТУС</p>
-                    <h2 id="status">Загрузка игры...</h2>
-                </div>
-                <button id="reset" class="reset-button" type="button">
-                    Новая игра
-                </button>
-            </div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-login" aria-selected="true">Вход</button>
+      <button type="button" role="tab" id="tab-register" aria-selected="false">Регистрация</button>
+    </div>
 
-            <div class="players">
-                <div class="player">
-                    <span class="player-dot player-one"></span>
-                    <span>Игрок 1</span>
-                </div>
-                <div class="player">
-                    <span class="player-dot player-two"></span>
-                    <span>Игрок 2</span>
-                </div>
-            </div>
+    <form id="auth-form" novalidate>
+      <label>Имя пользователя
+        <input id="username" name="username" autocomplete="username"
+               minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" required>
+      </label>
+      <label>Пароль
+        <input id="password" name="password" type="password"
+               autocomplete="current-password" minlength="8" maxlength="128" required>
+      </label>
+      <p class="hint" id="auth-hint">Имя пользователя должно содержать от 3 до 32 символа (латинские буквы, цифры, _), пароль - от 8 символов.</p>
+      <p class="error" id="auth-error" role="alert"></p>
+      <button type="submit" id="auth-submit" class="primary">Войти</button>
+    </form>
+  </main>
 
-            <div id="board" class="board" aria-label="Игровое поле"></div>
+  <main id="game" class="screen" hidden>
+    <header>
+      <h1>Connect 4</h1>
+      <div class="user">
+        <span id="whoami"></span>
+        <button type="button" id="logout">Выйти</button>
+      </div>
+    </header>
 
-            <p id="error" class="error" role="alert"></p>
-            <p class="hint">Нажми на колонку, чтобы поставить фишку.</p>
-        </section>
-    </main>
+    <p id="status" class="status" aria-live="polite"></p>
+
+    <div id="board" class="board" aria-label="Игровое поле"></div>
+
+    <p class="error" id="game-error" role="alert"></p>
+
+    <footer>
+      <span id="you" class="you"></span>
+      <button type="button" id="reset" class="primary" hidden>Новая игра</button>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>

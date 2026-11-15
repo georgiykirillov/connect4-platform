@@ -54,7 +54,9 @@ def assign_player(user_id: int) -> int | None:
 
 
 def get_state() -> GameStateResponse:
-    if not game.finished:
+    if not game.finished and len(players) < 2:
+        status = GameStatus.WAITING
+    elif not game.finished:
         status = GameStatus.IN_PROGRESS
     else:
         status = GameStatus.FINISHED
