@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from pwdlib import PasswordHash
@@ -20,7 +20,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_token(user_id: int) -> str:
-    exp = datetime.now(timezone.utc) + TOKEN_LIFE
+    exp = datetime.now(UTC) + TOKEN_LIFE
     return jwt.encode({"sub": str(user_id), "exp": exp}, SECRET_KEY, algorithm="HS256")
 
 

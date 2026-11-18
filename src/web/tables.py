@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -89,7 +89,7 @@ async def broadcast(game_id: int, state: GameStateResponse) -> None:
 async def save_state(db: AsyncSession, record: GameRecord, game: Game) -> GameStateResponse:
     record.game_data = game.to_dict()
     if game.finished:
-        record.finished_time = datetime.now(timezone.utc)
+        record.finished_time = datetime.now(UTC)
 
     await db.commit()
 
