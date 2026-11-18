@@ -4,10 +4,9 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import Credentials, UserOut
-from db.db import User, get_db
+from db.db import DB, User
 from db.security import (
     DUMMY_HASH,
     TOKEN_LIFE,
@@ -20,7 +19,7 @@ from db.security import (
 COOKIE_NAME = "session"
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "1") == "1"
 
-router = APIRouter(prefix="/api/auth")
+auth_router = APIRouter(prefix="/api/auth")
 
 
 def set_session(response: Response, user_id: int) -> None:
@@ -34,7 +33,7 @@ def set_session(response: Response, user_id: int) -> None:
 
 
 async def get_current_user(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DB,
     token: str | None = Cookie(default=None, alias=COOKIE_NAME),
 ) -> User:
     user_id = decode_token(token) if token is not None else None
@@ -46,9 +45,12 @@ async def get_current_user(
     return user
 
 
-@router.post("/register", response_model=UserOut, status_code=201)
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+@auth_router.post("/register", response_model=UserOut, status_code=201)
 async def register(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DB,
     creds: Credentials,
     response: Response,
 ):
@@ -63,9 +65,9 @@ async def register(
     return user
 
 
-@router.post("/login", response_model=UserOut)
+@auth_router.post("/login", response_model=UserOut)
 async def login(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DB,
     creds: Credentials,
     response: Response,
 ):
@@ -79,12 +81,12 @@ async def login(
     return user
 
 
-@router.post("/logout", status_code=204)
+@auth_router.post("/logout", status_code=204)
 async def logout(response: Response):
     response.delete_cookie(COOKIE_NAME)
 
 
-@router.get("/me", response_model=UserOut)
-async def me(response: Response, user: Annotated[User, Depends(get_current_user)]):
+@auth_router.get("/me", response_model=UserOut)
+async def me(response: Response, user: CurrentUser):
     set_session(response, user.id)
     return user

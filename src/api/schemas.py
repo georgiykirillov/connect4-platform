@@ -14,31 +14,47 @@ class UserOut(BaseModel):
     username: str
 
 
+class PlayerOut(BaseModel):
+    id: int
+    username: str
+
+
+class MoveRequest(BaseModel):
+    column: int
+
+
+class BoardState(BaseModel):
+    width: int
+    height: int
+    modifiers: dict[str, Any]
+    cells: list[list[Literal[0, 1, 2]]]
+
+
 class GameStatus(str, Enum):
     WAITING = "waiting"
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
 
 
-class MoveRequest(BaseModel):
-    column: int
-    game_id: str = "main"
-
-
-class BoardState(BaseModel):
-    width: int
-    height: int
-    cells: list[list[Literal[0, 1, 2]]]
-    modifiers: dict[str, Any]
-
-
 class GameMeta(BaseModel):
     status: GameStatus
     current_player: Literal[1, 2]
     winner: Literal[0, 1, 2]
+    draw_offer: Literal[0, 1, 2]
 
 
-class GameStateResponse(BaseModel):
-    game: GameMeta
+class GameSummary(BaseModel):
+    game_id: int
+    game_meta: GameMeta
     board: BoardState
-    game_id: str = "main"
+    player1: PlayerOut | None
+    player2: PlayerOut | None
+
+
+class GameStateResponse(GameSummary):
+    moves: list[int]
+
+
+class GameList(BaseModel):
+    waiting_games: list[GameSummary]
+    my_games: list[GameSummary]
