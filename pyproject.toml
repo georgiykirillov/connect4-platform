@@ -2,7 +2,7 @@
 name = "connect4-platform"
 version = "0.1.0"
 description = "Extensible Connect Four game platform"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0.0",
     "fastapi>=0.100.0",
